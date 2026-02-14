@@ -1,0 +1,33 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+*.out
+
+# Folders
+# vendor/
+# Package files # .pkg/
+
+# Code coverage results
+*.coverprofile
+*.logfile
+
+# Environment files
+.env
+.env.*
+
+# Local development files and configurations
+go.work.sum
+go.work.lock
+.idea/ # For GoLand/IntelliJ
+.vscode/ # For VS Code
+.DS_Store # For macOS
+Thumbs.db # For Windows
+
+# Depedency directories (uncomment if using vendoring)
+# vendor/ 
