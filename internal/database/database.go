@@ -5,22 +5,33 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	_ "github.com/lib/pq"
 )
 
-var DB *sql.DB
+type Database struct {
+	DB *sql.DB
+}
 
-func InitDB() error {
+func (d *Database) GetDB() *sql.DB {
+	return d.DB
+}
+
+func (d *Database) InitDB() error {
 	connStr := os.Getenv("DATABASE_URL")
 
 	var err error
-	DB, err = sql.Open("postgres", connStr)
+	d.DB, err = sql.Open("postgres", connStr)
 	if err != nil {
 		return fmt.Errorf("ошибка подключения к БД: %v", err)
 	}
 
-	err = DB.Ping()
+	d.DB.SetMaxOpenConns(25)
+	d.DB.SetMaxIdleConns(25)
+	d.DB.SetConnMaxLifetime(5 * time.Minute)
+
+	err = d.DB.Ping()
 	if err != nil {
 		return fmt.Errorf("ошибка ping БД: %v", err)
 	}
@@ -29,9 +40,9 @@ func InitDB() error {
 	return nil
 }
 
-func CloseDB() {
-	if DB != nil {
-		DB.Close()
+func (d *Database) CloseDB() {
+	if d.DB != nil {
+		d.DB.Close()
 		log.Println("Соединение с БД закрыто")
 	}
 }
