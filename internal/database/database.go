@@ -3,46 +3,38 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"log"
-	"os"
+	"log/slog"
 	"time"
 
 	_ "github.com/lib/pq"
 )
 
-type Database struct {
-	DB *sql.DB
-}
-
-func (d *Database) GetDB() *sql.DB {
-	return d.DB
-}
-
-func (d *Database) InitDB() error {
-	connStr := os.Getenv("DATABASE_URL")
-
-	var err error
-	d.DB, err = sql.Open("postgres", connStr)
-	if err != nil {
-		return fmt.Errorf("ошибка подключения к БД: %v", err)
+func InitDB(connStr string) (*sql.DB, error) {
+	if connStr == "" {
+		return nil, fmt.Errorf("Строка подключения не должна быть пустой")
 	}
 
-	d.DB.SetMaxOpenConns(25)
-	d.DB.SetMaxIdleConns(25)
-	d.DB.SetConnMaxLifetime(5 * time.Minute)
-
-	err = d.DB.Ping()
+	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		return fmt.Errorf("ошибка ping БД: %v", err)
+		return nil, fmt.Errorf("Ошибка подключения к БД: %w", err)
 	}
 
-	log.Println("База данных подключена успешно")
-	return nil
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(25)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
+	err = db.Ping()
+	if err != nil {
+		return nil, fmt.Errorf("Ошибка ping БД: %w", err)
+	}
+
+	slog.Info("База данных подключена успешно")
+	return db, nil
 }
 
-func (d *Database) CloseDB() {
-	if d.DB != nil {
-		d.DB.Close()
-		log.Println("Соединение с БД закрыто")
+func CloseDB(db *sql.DB) {
+	if db != nil {
+		db.Close()
+		slog.Info("Соединение с БД закрыто")
 	}
 }

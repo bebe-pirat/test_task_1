@@ -3,7 +3,11 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"test_task/internal/entity"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 type SubscriptionRepository struct {
@@ -16,26 +20,26 @@ func NewSubscriptionRepository(db *sql.DB) *SubscriptionRepository {
 	}
 }
 
-func (r *SubscriptionRepository) CreateSubscription(ctx context.Context, e entity.Subscription) error {
+func (r *SubscriptionRepository) CreateSubscription(ctx context.Context, e entity.Subscription) (uuid.UUID, error) {
 	query := `
-		INSERT INTO subscription(service_name, price, user_id, start_date)
-		VALUES($1, $2, $3, $4)
+		INSERT INTO subscription(service_name, price, user_id, start_date, end_date)
+		VALUES($1, $2, $3, $4, $5)
 		RETURNING id
 		`
 
-	var id int
+	var id uuid.UUID
 
-	err := r.db.QueryRowContext(ctx, query, e.ServiceName, e.Price, e.UserId, e.StartDate).Scan(&id)
+	err := r.db.QueryRowContext(ctx, query, e.ServiceName, e.Price, e.UserId, e.StartDate, e.EndDate).Scan(&id)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 
-	return nil
+	return id, nil
 }
 
-func (r *SubscriptionRepository) GetSubscriptionById(ctx context.Context, id int) (*entity.Subscription, error) {
+func (r *SubscriptionRepository) GetSubscriptionById(ctx context.Context, id uuid.UUID) (*entity.Subscription, error) {
 	query := `
-		SELECT id, service_name, price, user_id, start_date
+		SELECT id, service_name, price, user_id, start_date, end_date
 		FROM subscription
 		WHERE id = $1
 	`
@@ -48,6 +52,7 @@ func (r *SubscriptionRepository) GetSubscriptionById(ctx context.Context, id int
 		&sub.Price,
 		&sub.UserId,
 		&sub.StartDate,
+		&sub.EndDate,
 	)
 
 	if err != nil {
@@ -57,9 +62,9 @@ func (r *SubscriptionRepository) GetSubscriptionById(ctx context.Context, id int
 	return &sub, nil
 }
 
-func (r *SubscriptionRepository) GetAllSubsctiptions(ctx context.Context) ([]entity.Subscription, error) {
+func (r *SubscriptionRepository) GetAllSubscriptions(ctx context.Context) ([]entity.Subscription, error) {
 	query := `
-		SELECT id, service_name, price, user_id, start_date
+		SELECT id, service_name, price, user_id, start_date, end_date
 		FROM subscription
 	`
 
@@ -77,7 +82,9 @@ func (r *SubscriptionRepository) GetAllSubsctiptions(ctx context.Context) ([]ent
 			&sub.ServiceName,
 			&sub.Price,
 			&sub.UserId,
-			&sub.StartDate)
+			&sub.StartDate,
+			&sub.EndDate,
+		)
 
 		if err != nil {
 			return nil, err
@@ -85,6 +92,7 @@ func (r *SubscriptionRepository) GetAllSubsctiptions(ctx context.Context) ([]ent
 
 		subs = append(subs, sub)
 	}
+
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -92,7 +100,7 @@ func (r *SubscriptionRepository) GetAllSubsctiptions(ctx context.Context) ([]ent
 	return subs, nil
 }
 
-func (r *SubscriptionRepository) DeleteSubById(ctx context.Context, id int) error {
+func (r *SubscriptionRepository) DeleteSubById(ctx context.Context, id uuid.UUID) error {
 	query := `
 		DELETE FROM subscription
 		WHERE id = $1
@@ -112,35 +120,71 @@ func (r *SubscriptionRepository) DeleteSubById(ctx context.Context, id int) erro
 func (r *SubscriptionRepository) UpdateSubById(ctx context.Context, e entity.Subscription) error {
 	query := `
 		UPDATE subscription 
-		SET service_name = $1, price = $2, user_id = $3, start_date = $4
-		WHERE id = $5
+		SET service_name = $1, price = $2, user_id = $3, start_date = $4, end_date = $5
+		WHERE id = $6
 	`
 
-	res, err := r.db.ExecContext(ctx, query, e.ServiceName, e.Price, e.UserId, e.StartDate, e.Id)
+	res, err := r.db.ExecContext(ctx, query, e.ServiceName, e.Price, e.UserId, e.StartDate, e.EndDate, e.Id)
 	if err != nil {
 		return err
 	}
-	if rows, _ := res.RowsAffected(); rows == 0 {
+	rows, err := res.RowsAffected()
+	if rows == 0 {
 		return sql.ErrNoRows
+	}
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func (r *SubscriptionRepository) GetTotalCost(ctx context.Context) (int, error) {
+func (r *SubscriptionRepository) GetTotalCost(ctx context.Context, userId uuid.UUID, serviceName string, fromDate string, toDate *string) (int, error) {
 	query := `
-		SELECT SUM(price)
-		FROM subscription
-	`
+        SELECT COALESCE(SUM(price), 0)
+        FROM subscription
+        WHERE 1=1
+    `
+	args := []interface{}{}
+	argCounter := 1
+
+	if userId != uuid.Nil {
+		query += fmt.Sprintf(" AND user_id = $%d", argCounter)
+		args = append(args, userId)
+		argCounter++
+	}
+
+	if serviceName != "" {
+		query += fmt.Sprintf(" AND service_name = $%d", argCounter)
+		args = append(args, serviceName)
+		argCounter++
+	}
+
+	if fromDate != "" {
+		query += fmt.Sprintf(" AND start_date >= $%d", argCounter)
+		date, err := time.Parse("2006-01-02", fromDate)
+		if err != nil {
+			return 0, err
+		}
+		args = append(args, date)
+		argCounter++
+	}
+
+	if toDate != nil {
+		query += fmt.Sprintf(" AND end_date <= $%d", argCounter)
+		date, err := time.Parse("2006-01-02", *toDate)
+		if err != nil {
+			return 0, err
+		}
+		args = append(args, date)
+		argCounter++
+	}
 
 	var sum int
 
-	err := r.db.QueryRowContext(ctx, query).Scan(
-		&sum,
-	)
-
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(&sum)
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 
 	return sum, nil

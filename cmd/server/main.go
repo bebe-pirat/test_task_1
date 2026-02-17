@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"test_task/internal/database"
@@ -10,34 +10,51 @@ import (
 	"test_task/internal/service"
 
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 )
 
 func main() {
-	var db database.Database
-	err := db.InitDB()
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
+	if err := godotenv.Load(); err != nil {
+		slog.Warn(".env file not found, using system environment variables")
+	}
+
+	connStr := os.Getenv("DATABASE_URL")
+	db, err := database.InitDB(connStr)
 	if err != nil {
-		log.Printf("Ошибка инициализации БД: %v\n", err)
+		slog.Error("Ошибка инициализации БД: ", "error", err)
 		return
 	}
-	defer db.CloseDB()
+	defer database.CloseDB(db)
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
 	}
 
-	subRepo := repository.NewSubscriptionRepository(db.DB)
+	subRepo := repository.NewSubscriptionRepository(db)
 	subService := service.NewSubscriptionService(subRepo)
 	subHandler := handler.NewSubscriptionHandler(subService)
 
 	router := mux.NewRouter()
 
+	router.HandleFunc("/subscriptions", subHandler.CreateSubHandler).Methods("POST")
 	router.HandleFunc("/subscriptions", subHandler.GetAllSubsHandler).Methods("GET")
-	router.HandleFunc("/subscriptions/id", subHandler.GetSubHandler).Methods("GET")
-	http.Handle("/", router)
+	router.HandleFunc("/subscriptions/total", subHandler.GetTotalCostHandler).Methods("GET")
+	router.HandleFunc("/subscriptions/{id}", subHandler.GetSubHandler).Methods("GET")
+	router.HandleFunc("/subscriptions/{id}", subHandler.DeleteSubHandler).Methods("DELETE")
+	router.HandleFunc("/subscriptions/{id}", subHandler.UpdateSubHandler).Methods("PUT")
+	server := &http.Server{
+		Addr:    ":" + port,
+		Handler: router,
+	}
 
-	log.Printf("Сервер запущен на порту %s\n", port)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
-		log.Fatal(err)
+	slog.Info("server started" + port)
+
+	if err := server.ListenAndServe(); err != nil {
+		slog.Error("server didn't started", "error", err)
+		return
 	}
 }

@@ -1,13 +1,14 @@
 package handler
 
 import (
+	"database/sql"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
-	"strconv"
 	"test_task/internal/entity"
 	"test_task/internal/service"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
 
@@ -28,33 +29,46 @@ func (h *SubscriptionHandler) CreateSubHandler(w http.ResponseWriter, r *http.Re
 
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		log.Println("Неправильный джейсон", err)
+		slog.Error("Неправильный JSON", "error", err)
+		return
+	}
+	defer r.Body.Close()
+
+	_, err := h.service.CreateSubscription(ctx, request)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		slog.Error("Ошибка создания подписки", "error", err)
 		return
 	}
 
-	err := h.service.CreateSubscription(ctx, request)
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Println("Ошибка создания подписки", err)
-	}
+	w.WriteHeader(http.StatusCreated)
 }
 
 func (h *SubscriptionHandler) DeleteSubHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
-	id, err := strconv.Atoi(vars["id"])
+	id, err := uuid.Parse(vars["id"])
 	if err != nil {
-		http.Error(w, "Invalid json", http.StatusInternalServerError)
-		log.Println("Неверный json", err)
+		http.Error(w, "Invalid json", http.StatusBadRequest)
+		slog.Error("Неверный json", "error", err)
 		return
 	}
 
 	err = h.service.DeleteSubById(ctx, id)
+	if err == sql.ErrNoRows {
+		http.Error(w, "Row not found", http.StatusNotFound)
+		slog.Info("Не найдена запись для удаления", "error", sql.ErrNoRows)
+		return
+	}
+
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Println("Ошибка удаления подписки", err)
+		slog.Error("Ошибка удаления подписки", "error", err)
+		return
 	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *SubscriptionHandler) UpdateSubHandler(w http.ResponseWriter, r *http.Request) {
@@ -64,14 +78,16 @@ func (h *SubscriptionHandler) UpdateSubHandler(w http.ResponseWriter, r *http.Re
 
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		log.Println("Неправильный джейсон", err)
+		slog.Error("Неправильный джейсон", "error", err)
 		return
 	}
+	defer r.Body.Close()
 
 	err := h.service.UpdateSubById(ctx, request)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Println("Ошибка обновления подписки", err)
+		slog.Error("Ошибка обновления подписки", "error", err)
+		return
 	}
 }
 
@@ -81,43 +97,75 @@ func (h *SubscriptionHandler) GetAllSubsHandler(w http.ResponseWriter, r *http.R
 	subs, err := h.service.GetAllSubscriptions(ctx)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Println("Ошибка чтения подписок", err)
-	}
-
-	jsonData, err := json.Marshal(subs)
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Println("Ошибка сериализации", err)
+		slog.Error("Ошибка чтения подписок", "error", err)
 		return
 	}
 
-	w.Write(jsonData)
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(subs); err != nil {
+		slog.Error("Ошибка сериализации", "error", err)
+	}
 }
 
 func (h *SubscriptionHandler) GetSubHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
-	id, err := strconv.Atoi(vars["id"])
+	id, err := uuid.Parse(vars["id"])
 	if err != nil {
-		http.Error(w, "Invalid json", http.StatusInternalServerError)
-		log.Println("Неверный json", err)
+		http.Error(w, "Invalid json", http.StatusBadRequest)
+		slog.Error("Неверный json", "error", err)
 		return
 	}
 
 	sub, err := h.service.GetSubscriptionById(ctx, id)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Println("Ошибка чтения подписок", err)
+		slog.Error("Ошибка чтения подписок", "error", err)
 		return
 	}
 
-	jsonData, err := json.Marshal(sub)
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(sub); err != nil {
+		slog.Error("Ошибка сериализации", "error", err)
+	}
+}
+
+func (h *SubscriptionHandler) GetTotalCostHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	query := r.URL.Query()
+
+	serviceName := query.Get("service_name")
+	userIDStr := query.Get("user_id")
+	fromDate := query.Get("from_date")
+	toDateStr := query.Get("to_date")
+	var toDate *string = nil
+	if toDateStr != "" {
+		toDate = &toDateStr
+	}
+
+	var userID uuid.UUID
+	if userIDStr != "" {
+		parsed, err := uuid.Parse(userIDStr)
+		if err != nil {
+			http.Error(w, "invalid user_id", http.StatusBadRequest)
+			slog.Error("ошибка парсинга id", "error", err)
+			return
+		}
+		userID = parsed
+	}
+
+	total, err := h.service.GetTotalCost(ctx, userID, serviceName, fromDate, toDate)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Println("Ошибка сериализации", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		slog.Error("ошибка получения фильтрации", "error", err)
 		return
 	}
 
-	w.Write(jsonData)
+	json.NewEncoder(w).Encode(map[string]int{
+		"total": total,
+	})
 }
