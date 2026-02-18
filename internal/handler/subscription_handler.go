@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"test_task/internal/entity"
 	"test_task/internal/service"
 
@@ -62,7 +63,7 @@ func (h *SubscriptionHandler) CreateSubHandler(w http.ResponseWriter, r *http.Re
 // @Tags subscriptions
 // @Accept json
 // @Produce application/json
-// @Param id path string true "Subscription ID" Format(uuid)
+// @Param id path int true "Subscription ID"
 // @Success 204
 // @Failure 400 {string} string
 // @Failure 500 {string} string
@@ -71,7 +72,7 @@ func (h *SubscriptionHandler) DeleteSubHandler(w http.ResponseWriter, r *http.Re
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
-	id, err := uuid.Parse(vars["id"])
+	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
 		http.Error(w, "Invalid json", http.StatusBadRequest)
 		slog.Error("Неверный json", "error", err)
@@ -160,7 +161,7 @@ func (h *SubscriptionHandler) GetAllSubsHandler(w http.ResponseWriter, r *http.R
 // @Tags subscriptions
 // @Accept json
 // @Produce json
-// @Param id path string true "Subscription ID" Format(uuid)
+// @Param id path int true "Subscription ID"
 // @Success 200 {object} entity.Subscription "Subscription found"
 // @Failure 400 {string} string
 // @Failure 500 {string} string
@@ -169,7 +170,7 @@ func (h *SubscriptionHandler) GetSubHandler(w http.ResponseWriter, r *http.Reque
 	ctx := r.Context()
 
 	vars := mux.Vars(r)
-	id, err := uuid.Parse(vars["id"])
+	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
 		http.Error(w, "Invalid json", http.StatusBadRequest)
 		slog.Error("Неверный json", "error", err)
@@ -204,7 +205,7 @@ func (h *SubscriptionHandler) GetSubHandler(w http.ResponseWriter, r *http.Reque
 // @Success 200 {object} map[string]int "Total cost"
 // @Failure 400 {string} string
 // @Failure 500 {string} string
-// @Router /subscriptions/total-cost [get]
+// @Router /subscriptions/total [get]
 func (h *SubscriptionHandler) GetTotalCostHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"test_task/internal/entity"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -20,26 +19,26 @@ func NewSubscriptionRepository(db *sql.DB) *SubscriptionRepository {
 	}
 }
 
-func (r *SubscriptionRepository) CreateSubscription(ctx context.Context, e entity.Subscription) (uuid.UUID, error) {
+func (r *SubscriptionRepository) CreateSubscription(ctx context.Context, e entity.Subscription) (int, error) {
 	query := `
 		INSERT INTO subscription(service_name, price, user_id, start_date, end_date)
 		VALUES($1, $2, $3, $4, $5)
 		RETURNING id
 		`
 
-	var id uuid.UUID
+	var id int
 
 	err := r.db.QueryRowContext(ctx, query, e.ServiceName, e.Price, e.UserId, e.StartDate, e.EndDate).Scan(&id)
 	if err != nil {
-		return uuid.Nil, err
+		return 0, err
 	}
 
 	return id, nil
 }
 
-func (r *SubscriptionRepository) GetSubscriptionById(ctx context.Context, id uuid.UUID) (*entity.Subscription, error) {
+func (r *SubscriptionRepository) GetSubscriptionById(ctx context.Context, id int) (*entity.Subscription, error) {
 	query := `
-		SELECT id, service_name, price, user_id, start_date, end_date
+		SELECT id, service_name, price, user_id, formatted_start_date, formatted_end_date
 		FROM subscription
 		WHERE id = $1
 	`
@@ -64,7 +63,7 @@ func (r *SubscriptionRepository) GetSubscriptionById(ctx context.Context, id uui
 
 func (r *SubscriptionRepository) GetAllSubscriptions(ctx context.Context) ([]entity.Subscription, error) {
 	query := `
-		SELECT id, service_name, price, user_id, start_date, end_date
+		SELECT id, service_name, price, user_id, formatted_start_date, formatted_end_date
 		FROM subscription
 	`
 
@@ -100,7 +99,7 @@ func (r *SubscriptionRepository) GetAllSubscriptions(ctx context.Context) ([]ent
 	return subs, nil
 }
 
-func (r *SubscriptionRepository) DeleteSubById(ctx context.Context, id uuid.UUID) error {
+func (r *SubscriptionRepository) DeleteSubById(ctx context.Context, id int) error {
 	query := `
 		DELETE FROM subscription
 		WHERE id = $1
@@ -162,21 +161,13 @@ func (r *SubscriptionRepository) GetTotalCost(ctx context.Context, userId uuid.U
 
 	if fromDate != "" {
 		query += fmt.Sprintf(" AND start_date >= $%d", argCounter)
-		date, err := time.Parse("2006-01-02", fromDate)
-		if err != nil {
-			return 0, err
-		}
-		args = append(args, date)
+		args = append(args, fromDate)
 		argCounter++
 	}
 
 	if toDate != nil {
 		query += fmt.Sprintf(" AND end_date <= $%d", argCounter)
-		date, err := time.Parse("2006-01-02", *toDate)
-		if err != nil {
-			return 0, err
-		}
-		args = append(args, date)
+		args = append(args, toDate)
 		argCounter++
 	}
 

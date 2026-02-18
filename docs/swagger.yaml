@@ -5,7 +5,7 @@ definitions:
       end_date:
         type: string
       id:
-        type: string
+        type: integer
       price:
         type: integer
       service_name:
@@ -82,11 +82,10 @@ paths:
       description: Delete an existing subscription by its ID
       parameters:
       - description: Subscription ID
-        format: uuid
         in: path
         name: id
         required: true
-        type: string
+        type: integer
       produces:
       - application/json
       responses:
@@ -109,11 +108,10 @@ paths:
       description: Show an existing subscription by id
       parameters:
       - description: Subscription ID
-        format: uuid
         in: path
         name: id
         required: true
-        type: string
+        type: integer
       produces:
       - application/json
       responses:
@@ -159,7 +157,7 @@ paths:
       summary: Update a subscription by id
       tags:
       - subscriptions
-  /subscriptions/total-cost:
+  /subscriptions/total:
     get:
       consumes:
       - application/json

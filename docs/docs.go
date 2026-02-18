@@ -95,7 +95,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/subscriptions/total-cost": {
+        "/subscriptions/total": {
             "get": {
                 "description": "Calculate total cost of subscriptions with optional filters",
                 "consumes": [
@@ -177,8 +177,7 @@ const docTemplate = `{
                 "summary": "Get a subscription by id",
                 "parameters": [
                     {
-                        "type": "string",
-                        "format": "uuid",
+                        "type": "integer",
                         "description": "Subscription ID",
                         "name": "id",
                         "in": "path",
@@ -261,8 +260,7 @@ const docTemplate = `{
                 "summary": "Delete a subscription by id",
                 "parameters": [
                     {
-                        "type": "string",
-                        "format": "uuid",
+                        "type": "integer",
                         "description": "Subscription ID",
                         "name": "id",
                         "in": "path",
@@ -297,7 +295,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "integer"
                 },
                 "price": {
                     "type": "integer"
