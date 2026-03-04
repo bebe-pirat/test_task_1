@@ -30,7 +30,7 @@ func NewSubscriptionHandler(service *service.SubscriptionService) *SubscriptionH
 // @Accept json
 // @Produce application/json
 // @Param subscription body entity.Subscription true "Subscription data"
-// @Success 201
+// @Success 201 {int} int "Subscription Id"
 // @Failure 400 {string} string
 // @Failure 500 {string} string
 // @Router /subscriptions [post]
@@ -46,14 +46,18 @@ func (h *SubscriptionHandler) CreateSubHandler(w http.ResponseWriter, r *http.Re
 	}
 	defer r.Body.Close()
 
-	_, err := h.service.CreateSubscription(ctx, request)
+	id, err := h.service.CreateSubscription(ctx, request)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		slog.Error("Ошибка создания подписки", "error", err)
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
+	if err := json.NewEncoder(w).Encode(id); err != nil {
+		slog.Error("Ошибка сериализации", "error", err)
+	}
 }
 
 // DeleteSubHandler godoc
@@ -80,13 +84,12 @@ func (h *SubscriptionHandler) DeleteSubHandler(w http.ResponseWriter, r *http.Re
 	}
 
 	err = h.service.DeleteSubById(ctx, id)
-	if err == sql.ErrNoRows {
-		http.Error(w, "Row not found", http.StatusNotFound)
-		slog.Info("Не найдена запись для удаления", "error", sql.ErrNoRows)
-		return
-	}
-
 	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "Row not found", http.StatusNotFound)
+			slog.Info("Не найдена запись для удаления", "error", sql.ErrNoRows)
+			return
+		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		slog.Error("Ошибка удаления подписки", "error", err)
 		return
@@ -120,6 +123,11 @@ func (h *SubscriptionHandler) UpdateSubHandler(w http.ResponseWriter, r *http.Re
 
 	err := h.service.UpdateSubById(ctx, request)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "Not Found", http.StatusNotFound)
+			slog.Error("Запись не найдена", "error", err)
+			return
+		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		slog.Error("Ошибка обновления подписки", "error", err)
 		return
@@ -179,6 +187,11 @@ func (h *SubscriptionHandler) GetSubHandler(w http.ResponseWriter, r *http.Reque
 
 	sub, err := h.service.GetSubscriptionById(ctx, id)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "Not Found", http.StatusNotFound)
+			slog.Error("Запись не найдена", "error", err)
+			return
+		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		slog.Error("Ошибка чтения подписок", "error", err)
 		return
