@@ -1,13 +1,18 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"test_task/internal/database"
 	"test_task/internal/handler"
 	"test_task/internal/repository"
 	"test_task/internal/service"
+	"time"
 
 	_ "test_task/docs"
 
@@ -81,10 +86,28 @@ func main() {
 		Handler: router,
 	}
 
-	slog.Info("server started" + port)
+	go func() {
+		slog.Info("server started", "port", port)
 
-	if err := server.ListenAndServe(); err != nil {
-		slog.Error("server didn't started", "error", err)
-		return
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("server didn't started", "error", err)
+			return
+		}
+	}()
+
+	signalChan := make(chan os.Signal, 1)
+
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+	<-signalChan
+
+	slog.Info("server is shutting down")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		slog.Error("server forced to shutdown", "error", err)
 	}
+
+	slog.Info("server exiting")
 }
