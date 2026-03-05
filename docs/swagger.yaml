@@ -63,7 +63,9 @@ paths:
       - application/json
       responses:
         "201":
-          description: Created
+          description: Subscription Id
+          schema:
+            type: int
         "400":
           description: Bad Request
           schema:

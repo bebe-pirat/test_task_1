@@ -78,7 +78,10 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "Created"
+                        "description": "Subscription Id",
+                        "schema": {
+                            "type": "int"
+                        }
                     },
                     "400": {
                         "description": "Bad Request",
@@ -323,7 +326,7 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "localhost:3000",
+	Host:             "localhost:8080",
 	BasePath:         "/",
 	Schemes:          []string{"http"},
 	Title:            "Subscription Service API",
