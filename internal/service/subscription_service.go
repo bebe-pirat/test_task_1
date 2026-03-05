@@ -131,19 +131,19 @@ func isDateValid(sourceStartDateStr *string, sourceEndDateStr *string) error {
 func parseMMYYYYToFullDate(dateStr string) (string, time.Time, error) {
 	parts := strings.Split(dateStr, "-")
 	if len(parts) != 2 {
-		return "", time.Time{}, fmt.Errorf("неверный формат: ожидается MM-YYYY")
+		return "", time.Time{}, fmt.Errorf("invalid date formar, expected format MM-YYYY: %v", dateStr)
 	}
 
 	month, year := parts[0], parts[1]
 
 	if len(month) != 2 || len(year) != 4 {
-		return "", time.Time{}, fmt.Errorf("неверная длина: месяц должен быть 2 цифры, год - 4 цифры")
+		return "", time.Time{}, fmt.Errorf("invalid date: month should take 2 numbers, year - 4 numbers")
 	}
 
 	fullDateStr := fmt.Sprintf("%s-%s-01", year, month)
 	date, err := time.Parse("2006-01-02", fullDateStr)
 	if err != nil {
-		return "", time.Time{}, fmt.Errorf("неверная дата: %s", dateStr)
+		return "", time.Time{}, fmt.Errorf("invalid date: %s", dateStr)
 	}
 
 	return fullDateStr, date, nil

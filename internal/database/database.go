@@ -11,12 +11,12 @@ import (
 
 func InitDB(connStr string) (*sql.DB, error) {
 	if connStr == "" {
-		return nil, fmt.Errorf("Строка подключения не должна быть пустой")
+		return nil, fmt.Errorf("connection string is required")
 	}
 
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		return nil, fmt.Errorf("Ошибка подключения к БД: %w", err)
+		return nil, fmt.Errorf("connection to database is failed %w", err)
 	}
 
 	db.SetMaxOpenConns(25)
@@ -25,16 +25,16 @@ func InitDB(connStr string) (*sql.DB, error) {
 
 	err = db.Ping()
 	if err != nil {
-		return nil, fmt.Errorf("Ошибка ping БД: %w", err)
+		return nil, fmt.Errorf("ping to database is failed %w", err)
 	}
 
-	slog.Info("База данных подключена успешно")
+	slog.Info("database is connected")
 	return db, nil
 }
 
 func CloseDB(db *sql.DB) {
 	if db != nil {
 		db.Close()
-		slog.Info("Соединение с БД закрыто")
+		slog.Info("no connection to database")
 	}
 }

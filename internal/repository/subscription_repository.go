@@ -140,7 +140,10 @@ func (r *SubscriptionRepository) UpdateSubById(ctx context.Context, e entity.Sub
 
 func (r *SubscriptionRepository) GetTotalCost(ctx context.Context, userId uuid.UUID, serviceName string, fromDate string, toDate *string) (int, error) {
 	query := `
-        SELECT COALESCE(SUM(price), 0)
+        SELECT COALESCE(SUM(price * (
+            (EXTRACT(YEAR FROM COALESCE(end_date, CURRENT_DATE)) - EXTRACT(YEAR FROM start_date)) * 12 +
+            (EXTRACT(MONTH FROM COALESCE(end_date, CURRENT_DATE)) - EXTRACT(MONTH FROM start_date))
+        )), 0)
         FROM subscription
         WHERE 1=1
     `
@@ -165,9 +168,9 @@ func (r *SubscriptionRepository) GetTotalCost(ctx context.Context, userId uuid.U
 		argCounter++
 	}
 
-	if toDate != nil {
+	if toDate != nil && *toDate != "" {
 		query += fmt.Sprintf(" AND end_date <= $%d", argCounter)
-		args = append(args, toDate)
+		args = append(args, *toDate)
 		argCounter++
 	}
 
