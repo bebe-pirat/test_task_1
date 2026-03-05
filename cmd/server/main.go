@@ -34,7 +34,7 @@ import (
 // @license.name Apache 2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
 //
-// @host localhost:3000
+// @host localhost:8080
 // @BasePath /
 // @schemes http
 //
@@ -52,14 +52,14 @@ func main() {
 	connStr := os.Getenv("DATABASE_URL")
 	db, err := database.InitDB(connStr)
 	if err != nil {
-		slog.Error("Ошибка инициализации БД: ", "error", err)
+		slog.Error("database is not initialized", "error", err)
 		return
 	}
 	defer database.CloseDB(db)
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "3000"
+		port = "8080"
 	}
 
 	subRepo := repository.NewSubscriptionRepository(db)
